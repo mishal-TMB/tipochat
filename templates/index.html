@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Типочат - Приватные комнаты</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background: #4a3f9c;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-header h1 {
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .room-info {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 200px;
+            background: #f5f5f5;
+            padding: 15px;
+            border-right: 1px solid #ddd;
+        }
+        .sidebar h3 {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .room-list {
+            list-style: none;
+        }
+        .room-item {
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .room-item:hover {
+            background: #e0e0e0;
+        }
+        .room-item.active {
+            background: #4a3f9c;
+            color: white;
+        }
+        .room-item small {
+            color: #999;
+            font-size: 11px;
+            margin-left: auto;
+        }
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fafafa;
+        }
+        .message {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            max-width: 80%;
+            animation: fadeIn 0.3s ease;
+        }
+        .message.own {
+            background: #4a3f9c;
+            color: white;
+            margin-left: auto;
+        }
+        .message.system {
+            background: #eee;
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            max-width: 100%;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .message.own .message-header {
+            color: rgba(255,255,255,0.8);
+        }
+        .username {
+            font-weight: bold;
+        }
+        .time {
+            color: #999;
+        }
+        .message.own .time {
+            color: rgba(255,255,255,0.8);
+        }
+        .input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+        .user-info {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        #username {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        #roomInput {
+            width: 120px;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        .message-input {
+            display: flex;
+            gap: 10px;
+        }
+        #messageInput {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #4a3f9c;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5a4fbc;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        .status {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #999;
+        }
+        .status.connected {
+            color: #4CAF50;
+        }
+        .invite-link {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: flex;
+            gap: 5px;
+        }
+        .invite-link input {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>
+                <span>💬 Типочат</span>
+                <span class="room-info" id="currentRoomDisplay">общая</span>
+            </h1>
+            <button onclick="showInvite()" class="secondary" style="padding: 5px 15px;">🔗 Пригласить</button>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <h3>Комнаты</h3>
+                <ul class="room-list" id="roomList">
+                    <li class="room-item active" onclick="joinRoom('general')">🏠 Общая <small>всегда</small></li>
+                </ul>
+
+                <div style="margin-top: 20px;">
+                    <h3>Создать комнату</h3>
+                    <input type="text" id="newRoomName" placeholder="название" style="width: 100%; padding: 8px; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 5px;">
+                    <button onclick="createRoom()" style="width: 100%; padding: 8px;">➕ Создать</button>
+                </div>
+            </div>
+
+            <div class="chat-area">
+                <div class="messages-area" id="messages"></div>
+
+                <div class="input-area">
+                    <div class="user-info">
+                        <input type="text" id="username" placeholder="Ваш ник" value="Аноним" maxlength="20">
+                    </div>
+
+                    <div class="message-input">
+                        <input type="text" id="messageInput" placeholder="Введите сообщение..." autocomplete="off">
+                        <button onclick="sendMessage()">➤</button>
+                    </div>
+
+                    <div class="status" id="connectionStatus">🔴 Не подключено</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно с приглашением -->
+    <div id="inviteModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+        <div style="background: white; padding: 20px; border-radius: 10px; max-width: 400px; width: 90%;">
+            <h3 style="margin-bottom: 15px;">🔗 Пригласить в комнату</h3>
+            <p style="margin-bottom: 10px;">Отправь эту ссылку другу:</p>
+            <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+                <input type="text" id="inviteLink" readonly style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                <button onclick="copyInviteLink()" style="padding: 8px 15px;">Копировать</button>
+            </div>
+            <button onclick="closeInvite()" style="width: 100%;">Закрыть</button>
+        </div>
+    </div>
+
+    <script>
+        // Получаем комнату из URL если есть
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlRoom = urlParams.get('room') || 'general';
+
+        // Состояние
+        let currentRoom = urlRoom;
+        let username = localStorage.getItem('chat_username') || 'Аноним';
+        document.getElementById('username').value = username;
+
+        // Подключаемся к серверу
+        var socket = io({
+            transports: ['websocket', 'polling'],
+            reconnection: true
+        });
+
+        // Элементы
+        const statusEl = document.getElementById('connectionStatus');
+        const currentRoomDisplay = document.getElementById('currentRoomDisplay');
+        const messagesEl = document.getElementById('messages');
+        const roomList = document.getElementById('roomList');
+
+        // Обновляем отображение комнаты
+        currentRoomDisplay.textContent = currentRoom === 'general' ? 'общая' : currentRoom;
+
+        // При подключении
+        socket.on('connect', function() {
+            console.log('Подключено!');
+            statusEl.innerHTML = '🟢 Подключено';
+            statusEl.className = 'status connected';
+
+            // Присоединяемся к комнате
+            socket.emit('join', {
+                username: username,
+                room: currentRoom
+            });
+
+            // Запрашиваем историю
+            socket.emit('get_history', { room: currentRoom });
+        });
+
+        socket.on('disconnect', function() {
+            statusEl.innerHTML = '🔴 Отключено';
+            statusEl.className = 'status';
+        });
+
+        // Получение новых сообщений
+        socket.on('new_message', function(msg) {
+            if (msg.room === currentRoom || !msg.room) {
+                addMessage(msg);
+            }
+        });
+
+        function addMessage(msg) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+
+            // Определяем, свое сообщение или нет
+            if (msg.username === username && msg.username !== 'Система') {
+                messageDiv.classList.add('own');
+            }
+            if (msg.username === 'Система') {
+                messageDiv.classList.add('system');
+            }
+
+            const time = msg.timestamp || new Date().toLocaleTimeString();
+
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span class="username">${escapeHtml(msg.username)}</span>
+                    <span class="time">${time}</span>
+                </div>
+                <div class="message-text">${escapeHtml(msg.text)}</div>
+            `;
+
+            messagesEl.appendChild(messageDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // Защита от XSS
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Отправка сообщения
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const usernameInput = document.getElementById('username').value.trim() || 'Аноним';
+
+            if (input.value.trim()) {
+                username = usernameInput;
+                localStorage.setItem('chat_username', username);
+
+                const messageData = {
+                    username: username,
+                    text: input.value,
+                    room: currentRoom,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+
+                socket.emit('send_message', messageData);
+                input.value = '';
+            }
+        }
+
+        // Enter для отправки
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Смена комнаты
+        function joinRoom(room) {
+            if (room === currentRoom) return;
+
+            // Выходим из старой комнаты
+            socket.emit('leave', { username: username });
+
+            // Обновляем текущую комнату
+            currentRoom = room;
+            currentRoomDisplay.textContent = room === 'general' ? 'общая' : room;
+
+            // Очищаем сообщения
+            messagesEl.innerHTML = '';
+
+            // Добавляем сообщение о загрузке
+            addMessage({
+                username: 'Система',
+                text: 'Загрузка истории...',
+                timestamp: new Date().toLocaleTimeString()
+            });
+
+            // Присоединяемся к новой комнате
+            socket.emit('join', {
+                username: username,
+                room: currentRoom
+            });
+
+            // Запрашиваем историю
+            socket.emit('get_history', { room: currentRoom });
+
+            // Обновляем активный пункт в списке
+            document.querySelectorAll('.room-item').forEach(el => {
+                el.classList.remove('active');
+                if (el.textContent.includes(room) || (room === 'general' && el.textContent.includes('Общая'))) {
+                    el.classList.add('active');
+                }
+            });
+
+            // Обновляем URL без перезагрузки
+            const url = new URL(window.location);
+            url.searchParams.set('room', room);
+            window.history.pushState({}, '', url);
+        }
+
+        // Создание новой комнаты
+        function createRoom() {
+            const newRoom = document.getElementById('newRoomName').value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!newRoom) return;
+
+            // Добавляем в список
+            const li = document.createElement('li');
+            li.className = 'room-item';
+            li.onclick = () => joinRoom(newRoom);
+            li.innerHTML = `🔐 ${newRoom} <small>приватная</small>`;
+            roomList.appendChild(li);
+
+            // Переходим в новую комнату
+            joinRoom(newRoom);
+
+            // Очищаем поле
+            document.getElementById('newRoomName').value = '';
+        }
+
+        // Приглашение
+        function showInvite() {
+            const modal = document.getElementById('inviteModal');
+            const link = `${window.location.origin}?room=${currentRoom}`;
+            document.getElementById('inviteLink').value = link;
+            modal.style.display = 'flex';
+        }
+
+        function closeInvite() {
+            document.getElementById('inviteModal').style.display = 'none';
+        }
+
+        function copyInviteLink() {
+            const link = document.getElementById('inviteLink');
+            link.select();
+            document.execCommand('copy');
+            alert('Ссылка скопирована!');
+        }
+
+        // Закрытие модалки по клику вне
+        window.onclick = function(event) {
+            const modal = document.getElementById('inviteModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Приветственное сообщение
+        window.onload = function() {
+            addMessage({
+                username: 'Система',
+                text: 'Добро пожаловать в чат! Создавайте приватные комнаты и приглашайте друзей по ссылке.',
+                timestamp: new Date().toLocaleTimeString()
+            });
+        };
+    </script>
+</body>
+</html>
