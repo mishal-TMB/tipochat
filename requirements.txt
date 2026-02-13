@@ -2,3 +2,5 @@ flask
 flask-socketio
 python-socketio
 flask-sqlalchemy
+gunicorn
+eventlet
