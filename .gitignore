@@ -1,0 +1,18 @@
+# PyCharm
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+
+# База данных
+*.db
+*.db-journal
+
+# Логи
+logs/
+*.log
