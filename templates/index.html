@@ -6,6 +6,7 @@
     <title>Типочат - Мессенджер</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
+        /* ===== ОБЩИЕ СТИЛИ ===== */
         * {
             margin: 0;
             padding: 0;
@@ -20,35 +21,145 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 10px;
         }
 
-        /* Контейнер адаптируется под экран */
-        .chat-container {
-            width: 100%;
-            max-width: 1200px;
-            height: 95vh;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+        /* ===== СТИЛИ ДЛЯ ПК (ШИРИНА > 768px) ===== */
+        @media (min-width: 769px) {
+            body {
+                padding: 20px;
+            }
+
+            .chat-container {
+                width: 100%;
+                max-width: 1200px;
+                height: 95vh;
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .main-content {
+                display: flex;
+                flex: 1;
+                overflow: hidden;
+            }
+
+            .sidebar {
+                width: 260px;
+                background: #f5f5f5;
+                padding: 15px;
+                border-right: 1px solid #ddd;
+                overflow-y: auto;
+            }
+
+            .menu-toggle {
+                display: none;
+            }
+
+            .mobile-room-header {
+                display: none;
+            }
         }
 
-        /* Для телефонов - на весь экран */
+        /* ===== СТИЛИ ДЛЯ ТЕЛЕФОНОВ (ШИРИНА < 768px) ===== */
         @media (max-width: 768px) {
             body {
                 padding: 0;
             }
+
             .chat-container {
+                width: 100%;
                 height: 100vh;
-                max-width: 100%;
-                border-radius: 0;
+                background: white;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .main-content {
+                display: flex;
+                flex: 1;
+                overflow: hidden;
+                position: relative;
+            }
+
+            /* Сайдбар скрыт за экраном */
+            .sidebar {
+                position: absolute;
+                left: -280px;
+                top: 0;
+                bottom: 0;
+                width: 280px;
+                background: #f5f5f5;
+                padding: 15px;
+                overflow-y: auto;
+                z-index: 100;
+                transition: left 0.3s ease;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            /* Затемнение фона */
+            .overlay {
+                display: none;
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 90;
+            }
+
+            .overlay.active {
+                display: block;
+            }
+
+            .menu-toggle {
+                display: block;
+                background: none;
+                border: none;
+                color: white;
+                font-size: 24px;
+                cursor: pointer;
+                padding: 0 10px;
+            }
+
+            /* Шапка комнаты на телефоне */
+            .mobile-room-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: #4a3f9c;
+                color: white;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
+            .chat-header {
+                padding: 8px 12px !important;
+            }
+
+            .message {
+                max-width: 90% !important;
+            }
+
+            .message-input button {
+                padding: 10px !important;
+                min-width: 40px;
+            }
+
+            #messageInput {
+                padding: 10px !important;
             }
         }
 
-        /* Шапка */
+        /* ===== ОБЩИЕ СТИЛИ (работают везде) ===== */
         .chat-header {
             background: #4a3f9c;
             color: white;
@@ -98,80 +209,7 @@
             transform: scale(0.95);
         }
 
-        /* Основной контент - гибкая сетка */
-        .main-content {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-            flex-direction: row;
-        }
-
-        /* На телефонах сайдбар может скрываться */
-        @media (max-width: 768px) {
-            .main-content {
-                position: relative;
-            }
-        }
-
-        /* Сайдбар */
-        .sidebar {
-            width: 260px;
-            background: #f5f5f5;
-            padding: 15px;
-            border-right: 1px solid #ddd;
-            overflow-y: auto;
-            transition: all 0.3s ease;
-        }
-
-        /* На телефонах сайдбар скрыт по умолчанию */
-        @media (max-width: 768px) {
-            .sidebar {
-                position: absolute;
-                left: -260px;
-                top: 0;
-                bottom: 0;
-                z-index: 90;
-                box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-                width: 80%;
-                max-width: 300px;
-            }
-
-            .sidebar.open {
-                left: 0;
-            }
-
-            /* Затемнение фона при открытом сайдбаре */
-            .sidebar.open + .chat-area::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.5);
-                z-index: 80;
-                pointer-events: none;
-            }
-        }
-
-        /* Кнопка меню для телефона */
-        .menu-toggle {
-            display: none;
-            background: #4a3f9c;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 10px;
-            font-size: 18px;
-            margin-right: 10px;
-        }
-
-        @media (max-width: 768px) {
-            .menu-toggle {
-                display: block;
-            }
-        }
-
+        /* Сайдбар контент */
         .sidebar h3 {
             color: #333;
             font-size: 14px;
@@ -219,7 +257,6 @@
             color: rgba(255,255,255,0.8);
         }
 
-        /* Создание комнаты */
         .create-room {
             margin-bottom: 20px;
         }
@@ -249,7 +286,6 @@
             transform: scale(0.98);
         }
 
-        /* Онлайн пользователи */
         .online-users {
             margin-top: 20px;
         }
@@ -287,7 +323,6 @@
             position: relative;
         }
 
-        /* Сообщения */
         .messages-area {
             flex: 1;
             overflow-y: auto;
@@ -303,20 +338,18 @@
             border-radius: 18px;
             margin-bottom: 5px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            max-width: 85%;
+            max-width: 80%;
             width: fit-content;
             animation: fadeIn 0.3s ease;
             word-break: break-word;
         }
 
-        /* Свои сообщения справа */
         .message.own {
             background: #4a3f9c;
             color: white;
             margin-left: auto;
         }
 
-        /* Системные сообщения по центру */
         .message.system {
             background: #eee;
             text-align: center;
@@ -362,7 +395,6 @@
             line-height: 1.4;
         }
 
-        /* Картинки в сообщениях */
         .message img {
             max-width: 100%;
             max-height: 200px;
@@ -390,7 +422,6 @@
             background: #f0f0f0;
         }
 
-        /* Панель кнопок и ввода */
         .message-input {
             display: flex;
             gap: 8px;
@@ -580,35 +611,18 @@
             cursor: pointer;
         }
 
-        /* Затемнение при открытом меню */
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 85;
-        }
-
-        .overlay.active {
-            display: block;
-        }
-
-        /* Скрываем аудио элементы */
         audio {
             display: none;
         }
     </style>
 </head>
 <body>
-    <!-- Звуки -->
+    <!-- Звуки (ЗАМЕНИЛ НА НОРМАЛЬНЫЕ) -->
     <audio id="messageSound" preload="auto">
-        <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" type="audio/mpeg">
+        <source src="https://www.soundjay.com/misc/sounds/soft-click-01.mp3" type="audio/mpeg">
     </audio>
     <audio id="joinSound" preload="auto">
-        <source src="https://www.soundjay.com/misc/sounds/pop-1.mp3" type="audio/mpeg">
+        <source src="https://www.soundjay.com/misc/sounds/chime-1.mp3" type="audio/mpeg">
     </audio>
 
     <div class="chat-container">
@@ -630,7 +644,7 @@
         </div>
 
         <div class="main-content">
-            <!-- Затемнение фона для мобильного меню -->
+            <!-- Затемнение для телефона -->
             <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
 
             <!-- Сайдбар -->
@@ -821,7 +835,7 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Управление звуком
+        // Управление звуком (НОРМАЛЬНЫЕ ЗВУКИ)
         function toggleSound() {
             soundEnabled = !soundEnabled;
             localStorage.setItem('soundEnabled', soundEnabled);
@@ -830,10 +844,16 @@
 
         function playSound(type) {
             if (!soundEnabled) return;
+
+            // ТИХИЕ НОРМАЛЬНЫЕ ЗВУКИ
             if (type === 'message') {
-                document.getElementById('messageSound').play().catch(e => {});
+                const sound = document.getElementById('messageSound');
+                sound.volume = 0.3;  // Громкость 30%
+                sound.play().catch(e => {});
             } else if (type === 'join') {
-                document.getElementById('joinSound').play().catch(e => {});
+                const sound = document.getElementById('joinSound');
+                sound.volume = 0.2;  // Громкость 20%
+                sound.play().catch(e => {});
             }
         }
 
