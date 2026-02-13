@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 import eventlet
 
-eventlet.monkey_patch()  # Это важно для WebSocket на Render!
+eventlet.monkey_patch()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
@@ -13,13 +13,24 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode='eventlet',  # Принудительно используем eventlet
-    logger=True,  # Включим логи для отладки
-    engineio_logger=True
-)
+
+# Определяем окружение
+is_render = os.environ.get('RENDER') or os.environ.get('IS_RENDER')
+
+if is_render:
+    print("🚀 Запуск на Render с WebSocket настройками")
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode='eventlet',
+        logger=True,
+        engineio_logger=True,
+        ping_timeout=60,
+        ping_interval=25
+    )
+else:
+    print("💻 Локальный запуск")
+    socketio = SocketIO(app, cors_allowed_origins="*", logger=True)
 
 
 # Модель сообщения
@@ -31,9 +42,9 @@ class Message(db.Model):
     room = db.Column(db.String(50), default='general')
 
 
-# Создаем базу данных
 with app.app_context():
     db.create_all()
+    print("✅ База данных создана")
 
 
 @app.route('/')
@@ -41,20 +52,15 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/room/<room_name>')
-def room(room_name):
-    return render_template('index.html', room=room_name)
-
-
 @socketio.on('connect')
 def handle_connect():
-    print('Клиент подключился! SID:', request.sid)
+    print(f'✅ Клиент подключился! SID: {request.sid}')
     emit('connected', {'data': 'Connected'})
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('Клиент отключился! SID:', request.sid)
+    print(f'❌ Клиент отключился! SID: {request.sid}')
 
 
 @socketio.on('join')
@@ -62,19 +68,9 @@ def on_join(data):
     username = data['username']
     room = data.get('room', 'general')
     join_room(room)
-    print(f'{username} присоединился к комнате {room}')
+    print(f'👤 {username} присоединился к комнате {room}')
 
-    # Отправляем историю сообщений
-    messages = Message.query.filter_by(room=room).order_by(Message.timestamp.desc()).limit(50).all()
-    for msg in reversed(messages):
-        emit('new_message', {
-            'username': msg.username,
-            'text': msg.text,
-            'timestamp': msg.timestamp.strftime('%H:%M:%S'),
-            'room': msg.room
-        }, room=request.sid)
-
-    # Уведомление о новом пользователе
+    # Отправляем приветственное сообщение
     emit('new_message', {
         'username': 'System',
         'text': f'{username} присоединился к чату',
@@ -83,11 +79,24 @@ def on_join(data):
     }, room=room)
 
 
+@socketio.on('get_history')
+def handle_get_history(data):
+    room = data.get('room', 'general')
+    print(f'📜 Запрос истории для комнаты {room}')
+    messages = Message.query.filter_by(room=room).order_by(Message.timestamp.desc()).limit(50).all()
+    for msg in reversed(messages):
+        emit('new_message', {
+            'username': msg.username,
+            'text': msg.text,
+            'timestamp': msg.timestamp.strftime('%H:%M:%S'),
+            'room': msg.room
+        })
+
+
 @socketio.on('send_message')
 def handle_message(data):
-    print(f"Сообщение от {data['username']} в комнате {data.get('room', 'general')}: {data['text']}")
+    print(f'💬 Сообщение от {data["username"]} в {data.get("room", "general")}: {data["text"]}')
 
-    # Сохраняем в базу
     new_message = Message(
         username=data['username'],
         text=data['text'],
@@ -96,7 +105,6 @@ def handle_message(data):
     db.session.add(new_message)
     db.session.commit()
 
-    # Отправляем всем в комнате
     emit('new_message', {
         'username': data['username'],
         'text': data['text'],
